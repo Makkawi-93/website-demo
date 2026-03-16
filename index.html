@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <title>WebGIS Cuneo – Dashboard</title>
+        <style>
+        * { box-sizing: border-box; }
+        html, body { width:100%; height:100%; padding:0; margin:0; font-family:'Segoe UI',Arial,sans-serif; background:#0a0f0d; display:flex; flex-direction:column; }
+        /* ── GLOBAL TOP NAVBAR ── */
+        #global-navbar { width:100%; height:42px; min-height:42px; background:#000000; display:flex; align-items:center; padding:0 16px; gap:0; z-index:2000; flex-shrink:0; }
+        #global-navbar .logo-text { font-size:13px; font-weight:700; color:#ffffff; letter-spacing:1px; text-transform:uppercase; margin-right:28px; white-space:nowrap; }
+        .nav-links { display:flex; align-items:center; gap:4px; flex:1; }
+        .nav-link { padding:5px 12px; background:transparent; border:none; color:#aaaaaa; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; border-radius:4px; transition:all .2s; font-family:'Segoe UI',Arial,sans-serif; white-space:nowrap; }
+        .nav-link:hover { color:#ffffff; background:rgba(255,255,255,0.08); }
+        .nav-navbar-lang { display:flex; gap:4px; margin-left:auto; }
+        .nav-lang-btn { padding:3px 9px; border:1px solid #333333; border-radius:4px; cursor:pointer; background:transparent; color:#888888; font-size:11px; font-weight:600; transition:all .2s; font-family:'Segoe UI',Arial,sans-serif; }
+        .nav-lang-btn.active { background:#1a4a2a; color:#a8d5b5; border-color:#4a8a5a; }
+        /* ── MAIN AREA ── */
+        #app-wrapper { display:flex; width:100%; flex:1; overflow:hidden; }
+        #map-container { flex:1; position:relative; height:100%; }
+        #map { width:100%; height:100%; }
+        #sidebar { width:420px; min-width:300px; height:100%; background:#0a0f0d; color:#e8f0e9; display:flex; flex-direction:column; border-left:1px solid #1e3a2a; overflow:hidden; position:relative; z-index:1000; }
+        /* ── OVERLAY POPUP ── */
+        .overlay-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center; }
+        .overlay-backdrop.open { display:flex; }
+        .overlay-box { background:#0d1a12; border:1px solid #2d5a3d; border-radius:12px; padding:32px 36px; max-width:560px; width:90%; position:relative; color:#e8f0e9; max-height:80vh; overflow-y:auto; }
+        .overlay-box h2 { margin:0 0 12px 0; font-size:16px; font-weight:700; color:#a8d5b5; text-transform:uppercase; letter-spacing:.6px; }
+        .overlay-box p { margin:0 0 10px 0; font-size:13px; color:#8ab89a; line-height:1.7; }
+        .overlay-box ul { margin:0 0 10px 0; padding-left:18px; }
+        .overlay-box ul li { font-size:13px; color:#8ab89a; line-height:1.8; }
+        .overlay-close { position:absolute; top:14px; right:16px; background:transparent; border:none; color:#5a8a6a; font-size:18px; cursor:pointer; line-height:1; }
+        .overlay-close:hover { color:#ffffff; }
+        #sidebar-header { padding:16px 20px 12px 20px; background:#0d1a12; border-bottom:1px solid #1e3a2a; position:relative; }
+        #sidebar-header h1 { margin:0 0 3px 0; font-size:14px; font-weight:700; color:#a8d5b5; letter-spacing:0.5px; text-transform:uppercase; }
+        #sidebar-header p { margin:0; font-size:11px; color:#4a7a5a; }
+        #lang-toggle { position:absolute; top:14px; right:14px; display:flex; gap:4px; }
+        .lang-btn { padding:3px 8px; border:1px solid #2d5a3d; border-radius:4px; cursor:pointer; background:transparent; color:#5a8a6a; font-size:11px; font-weight:600; transition:all .2s; }
+        .lang-btn.active { background:#1a4a2a; color:#a8d5b5; border-color:#4a8a5a; }
+        #empty-state { flex:1; overflow-y:auto; padding:18px; }
+        .province-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+        .stat-card { background:#0d1a12; border:1px solid #1e3a2a; border-radius:8px; padding:12px 14px; }
+        .stat-card .label { font-size:10px; color:#5a8a6a; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+        .stat-card .value { font-size:19px; font-weight:700; color:#a8d5b5; }
+        .empty-hint { text-align:center; padding:18px; color:#3d6b4d; font-size:13px; border:1px dashed #1e3a2a; border-radius:8px; margin-top:6px; }
+        .empty-hint .icon { font-size:26px; margin-bottom:8px; }
+        #muni-panel { flex:1; display:none; flex-direction:column; overflow:hidden; }
+        #muni-header { padding:12px 42px 12px 18px; background:#0d1a12; border-bottom:1px solid #1e3a2a; }
+        #muni-name { font-size:17px; font-weight:700; color:#c8f0d4; margin:0 0 2px 0; }
+        #muni-meta { font-size:11px; color:#5a8a6a; }
+        #muni-pop-badge { display:inline-block; background:#1a4a2a; color:#a8d5b5; border-radius:12px; padding:2px 10px; font-size:12px; font-weight:600; margin-top:5px; }
+        #close-btn { position:absolute; top:12px; right:12px; background:#1a3a2a; border:none; color:#5a8a6a; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:14px; line-height:26px; text-align:center; transition:all .2s; }
+        #close-btn:hover { background:#2d5a3d; color:#a8d5b5; }
+        #tab-bar { display:flex; background:#0a1510; border-bottom:1px solid #1e3a2a; overflow-x:auto; }
+        .tab-btn { padding:9px 13px; background:transparent; border:none; color:#4a7a5a; cursor:pointer; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; border-bottom:2px solid transparent; white-space:nowrap; transition:all .2s; flex-shrink:0; }
+        .tab-btn.active { color:#a8d5b5; border-bottom-color:#4a8a5a; background:#0d1a12; }
+        .tab-btn:hover:not(.active) { color:#7ab58a; }
+        #charts-area { flex:1; overflow-y:auto; padding:14px; }
+        .chart-section { display:none; }
+        .chart-section.active { display:block; }
+        .chart-title { font-size:11px; font-weight:700; color:#5a8a6a; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+        .chart-wrapper { background:#0d1a12; border:1px solid #1e3a2a; border-radius:8px; padding:12px; margin-bottom:12px; }
+        .chart-wrapper canvas { max-height:200px; }
+        .kpi-row { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+        .kpi-box { flex:1; min-width:75px; background:#0d1a12; border:1px solid #1e3a2a; border-radius:6px; padding:8px 10px; text-align:center; }
+        .kpi-box .kv { font-size:16px; font-weight:700; color:#a8d5b5; }
+        .kpi-box .kl { font-size:10px; color:#4a7a5a; margin-top:2px; }
+        .custom-tooltip-inner { background:#0a1510ee; border:1px solid #2d5a3d; border-radius:6px; padding:7px 11px; color:#c8f0d4; font-size:12px; white-space:nowrap; }
+        #charts-area::-webkit-scrollbar, #empty-state::-webkit-scrollbar { width:4px; }
+        #charts-area::-webkit-scrollbar-track, #empty-state::-webkit-scrollbar-track { background:#0a0f0d; }
+        #charts-area::-webkit-scrollbar-thumb, #empty-state::-webkit-scrollbar-thumb { background:#1e3a2a; border-radius:2px; }
+        .sector-btn { padding:4px 10px; background:transparent; border:1px solid #2d5a3d; border-radius:4px; color:#5a8a6a; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; cursor:pointer; transition:all .2s; font-family:'Segoe UI',Arial,sans-serif; }
+        .sector-btn.active { background:#1a4a2a; color:#a8d5b5; border-color:#4a8a5a; }
+        .sector-btn:hover:not(.active) { color:#a8d5b5; border-color:#4a8a5a; }
+        /* ── FILTER PANEL ── */
+        #filter-toggle-btn { background:#0d1a12; border:1px solid #2d5a3d; color:#a8d5b5; width:36px; height:36px; border-radius:6px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
+        #filter-toggle-btn:hover { background:#1a4a2a; border-color:#4a8a5a; }
+        #filter-toggle-btn.active { background:#1a4a2a; border-color:#7ad5a0; color:#7ad5a0; }
+        #filter-panel { position:fixed; z-index:2000; width:280px; background:#0d1a12; border:1px solid #2d5a3d; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6); display:none; flex-direction:column; max-height:calc(100vh - 180px); overflow:hidden; }
+        #filter-panel.open { display:flex; }
+        #filter-panel-header { padding:10px 14px; background:#0a1510; border-bottom:1px solid #1e3a2a; display:flex; justify-content:space-between; align-items:center; }
+        #filter-panel-header span { font-size:11px; font-weight:700; color:#a8d5b5; text-transform:uppercase; letter-spacing:1px; }
+        #filter-reset-btn { background:#1a2a1a; border:1px solid #2d5a3d; color:#5a8a6a; font-size:10px; padding:3px 8px; border-radius:4px; cursor:pointer; transition:all .2s; }
+        #filter-reset-btn:hover { color:#a8d5b5; border-color:#4a8a5a; }
+        #filter-body { overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:10px; }
+        #filter-body::-webkit-scrollbar { width:3px; }
+        #filter-body::-webkit-scrollbar-thumb { background:#1e3a2a; border-radius:2px; }
+        .filter-group { display:flex; flex-direction:column; gap:4px; }
+        .filter-label { font-size:9px; font-weight:700; color:#4a7a5a; text-transform:uppercase; letter-spacing:1px; }
+        .filter-range { display:flex; gap:6px; align-items:center; }
+        .filter-input { background:#0a1510; border:1px solid #1e3a2a; border-radius:4px; color:#c8f0d4; font-size:10px; padding:4px 7px; width:100%; outline:none; transition:border-color .2s; }
+        .filter-input:focus { border-color:#4a8a5a; }
+        .filter-sep { color:#2d5a3d; font-size:10px; flex-shrink:0; }
+        .filter-checks { display:flex; flex-direction:column; gap:3px; }
+        .filter-check { display:flex; align-items:center; gap:6px; cursor:pointer; }
+        .filter-check input[type=checkbox] { accent-color:#4a8a5a; cursor:pointer; }
+        .filter-check span { font-size:10px; color:#8ab89a; }
+        #filter-results { border-top:1px solid #1e3a2a; padding:10px 14px; }
+        #filter-results-title { font-size:9px; font-weight:700; color:#4a7a5a; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+        #filter-results-list { display:flex; flex-direction:column; gap:3px; max-height:140px; overflow-y:auto; }
+        #filter-results-list::-webkit-scrollbar { width:3px; }
+        #filter-results-list::-webkit-scrollbar-thumb { background:#1e3a2a; }
+        .filter-result-item { background:#0a1510; border:1px solid #1e3a2a; border-radius:4px; padding:5px 9px; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:6px; }
+        .filter-result-item:hover { background:#1a3a2a; border-color:#4a8a5a; }
+        .filter-result-item .ri-icon { font-size:11px; }
+        .filter-result-item .ri-name { font-size:10px; color:#a8d5b5; font-weight:600; flex:1; }
+        .filter-result-item .ri-sector { font-size:9px; color:#4a7a5a; }
+        #filter-count { font-size:9px; color:#5a8a6a; margin-bottom:4px; }
+        </style>
+    </head>
+    <body>
+        <!-- GLOBAL NAVBAR -->
+        <div id="global-navbar">
+            <div class="logo-text">Cuneo WebGIS</div>
+            <div class="nav-links">
+                <button class="nav-link" onclick="openOverlay('overlay-project')" data-it="Panoramica Progetto" data-en="Project Overview">Project Overview</button>
+                <button class="nav-link" onclick="openOverlay('overlay-data')" data-it="Fonti Dati" data-en="Data Source">Data Source</button>
+                <button class="nav-link" onclick="openOverlay('overlay-about')" data-it="Chi Siamo" data-en="About Us">About Us</button>
+                <button class="nav-link" onclick="openOverlay('overlay-help')" data-it="Aiuto" data-en="Help">Help</button>
+            </div>
+            <div class="nav-navbar-lang">
+                <button class="nav-lang-btn" onclick="setLang('it')">IT</button>
+                <button class="nav-lang-btn active" onclick="setLang('en')">EN</button>
+            </div>
+        </div>
+
+        <!-- OVERLAY: Project Overview -->
+        <div id="overlay-project" class="overlay-backdrop" onclick="closeOverlayBackdrop(event,this)">
+            <div class="overlay-box">
+                <button class="overlay-close" onclick="closeOverlay('overlay-project')">✕</button>
+                <h2 data-it="Panoramica Progetto" data-en="Project Overview">Project Overview</h2>
+                <p data-it="Questo WebGIS fornisce una visualizzazione interattiva dei dati demografici e imprenditoriali della Provincia di Cuneo, Piemonte, Italia."
+                   data-en="This WebGIS provides an interactive visualization of demographic and business data for the Province of Cuneo, Piedmont, Italy.">
+                    This WebGIS provides an interactive visualization of demographic and business data for the Province of Cuneo, Piedmont, Italy.
+                </p>
+                <p data-it="Cliccando su un comune sulla mappa è possibile esplorare grafici dettagliati sulla popolazione, le imprese agricole, manifatturiere e di trasporto."
+                   data-en="By clicking on a municipality on the map, you can explore detailed charts on population, agricultural, manufacturing and transport firms.">
+                    By clicking on a municipality on the map, you can explore detailed charts on population, agricultural, manufacturing and transport firms.
+                </p>
+                <ul>
+                    <li data-it="250 comuni della Provincia di Cuneo" data-en="250 municipalities of the Province of Cuneo">250 municipalities of the Province of Cuneo</li>
+                    <li data-it="Dati demografici per fascia d'età" data-en="Demographic data by age group">Demographic data by age group</li>
+                    <li data-it="Dati imprenditoriali per settore (Agricoltura, Manifatturiero, Trasporti)" data-en="Business data by sector (Agriculture, Manufacturing, Transport)">Business data by sector (Agriculture, Manufacturing, Transport)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- OVERLAY: Data Source -->
+        <div id="overlay-data" class="overlay-backdrop" onclick="closeOverlayBackdrop(event,this)">
+            <div class="overlay-box">
+                <button class="overlay-close" onclick="closeOverlay('overlay-data')">✕</button>
+                <h2 data-it="Fonti Dati" data-en="Data Source">Data Source</h2>
+                <p data-it="I dati utilizzati in questo progetto provengono dalle seguenti fonti ufficiali:"
+                   data-en="The data used in this project comes from the following official sources:">
+                    The data used in this project comes from the following official sources:
+                </p>
+                <ul>
+                    <li data-it="ISTAT – Dati demografici comunali 2022/2023" data-en="ISTAT – Municipal demographic data 2022/2023">ISTAT – Municipal demographic data 2022/2023</li>
+                    <li data-it="Registro Imprese – Sedi attive 2025" data-en="Business Registry – Active business locations 2025">Business Registry – Active business locations 2025</li>
+                    <li data-it="OpenStreetMap – Mappa di base" data-en="OpenStreetMap – Base map">OpenStreetMap – Base map</li>
+                    <li data-it="Regione Piemonte – Confini amministrativi" data-en="Regione Piemonte – Administrative boundaries">Regione Piemonte – Administrative boundaries</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- OVERLAY: About Us -->
+        <div id="overlay-about" class="overlay-backdrop" onclick="closeOverlayBackdrop(event,this)">
+            <div class="overlay-box">
+                <button class="overlay-close" onclick="closeOverlay('overlay-about')">✕</button>
+                <h2 data-it="Chi Siamo" data-en="About Us">About Us</h2>
+                <p data-it="Questo progetto è stato sviluppato per fornire uno strumento di analisi territoriale per la Provincia di Cuneo."
+                   data-en="This project was developed to provide a territorial analysis tool for the Province of Cuneo.">
+                    This project was developed to provide a territorial analysis tool for the Province of Cuneo.
+                </p>
+                <p data-it="Costruito con QGIS, Leaflet.js e Chart.js."
+                   data-en="Built with QGIS, Leaflet.js and Chart.js.">
+                    Built with QGIS, Leaflet.js and Chart.js.
+                </p>
+            </div>
+        </div>
+
+        <!-- OVERLAY: Help -->
+        <div id="overlay-help" class="overlay-backdrop" onclick="closeOverlayBackdrop(event,this)">
+            <div class="overlay-box">
+                <button class="overlay-close" onclick="closeOverlay('overlay-help')">✕</button>
+                <h2 data-it="Aiuto" data-en="Help">Help</h2>
+                <ul>
+                    <li data-it="Clicca su un comune sulla mappa per vedere i dati nel pannello di destra" data-en="Click on a municipality on the map to see data in the right panel">Click on a municipality on the map to see data in the right panel</li>
+                    <li data-it="Usa i pulsanti IT/EN in alto a destra per cambiare lingua" data-en="Use the IT/EN buttons at the top right to switch language">Use the IT/EN buttons at the top right to switch language</li>
+                    <li data-it="Usa il pannello dei layer (icona in alto a destra della mappa) per attivare/disattivare i layer" data-en="Use the layer panel (icon at top right of map) to toggle layers">Use the layer panel (icon at top right of map) to toggle layers</li>
+                    <li data-it="Usa lo strumento di misura per misurare distanze e aree sulla mappa" data-en="Use the measure tool to measure distances and areas on the map">Use the measure tool to measure distances and areas on the map</li>
+                    <li data-it="Clicca ✕ nel pannello del comune per tornare alla vista generale" data-en="Click ✕ in the municipality panel to return to the overview">Click ✕ in the municipality panel to return to the overview</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="app-wrapper">
+            <div id="map-container">
+                <div id="map"></div>
+            </div>
+            <div id="sidebar">
+                <div id="sidebar-header">
+                    <h1 id="sidebar-title">Cuneo Province – Dashboard</h1>
+                    <p id="sidebar-sub">Click a municipality to view data</p>
+                </div>
+                <!-- EMPTY STATE -->
+                <div id="empty-state">
+                    <div class="province-stat-grid">
+                        <div class="stat-card">
+                            <div class="label" data-it="Comuni" data-en="Municipalities">Municipalities</div>
+                            <div class="value">250</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label" data-it="Popolazione 2023" data-en="Population 2023">Population 2023</div>
+                            <div class="value" id="prov-pop">–</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label" data-it="Imprese Agr." data-en="Agriculture Firms">Agriculture Firms</div>
+                            <div class="value" id="prov-agr">–</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label" data-it="Imprese Manif." data-en="Manufacturing Firms">Manufacturing Firms</div>
+                            <div class="value" id="prov-man">–</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label" data-it="Imprese Trasp." data-en="Transport Firms">Transport Firms</div>
+                            <div class="value" id="prov-tra">–</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label" data-it="Superficie" data-en="Area (km²)">Area (km²)</div>
+                            <div class="value">6,903</div>
+                        </div>
+                    </div>
+                    <div class="empty-hint">
+                        <div class="icon">🗺️</div>
+                        <span data-it="Seleziona un comune sulla mappa per visualizzare grafici demografici e imprenditoriali"
+                              data-en="Select a municipality on the map to view demographic and business charts">
+                            Select a municipality on the map to view demographic and business charts
+                        </span>
+                    </div>
+                </div>
+                <!-- MUNICIPALITY PANEL -->
+                <div id="muni-panel">
+                    <button id="close-btn" onclick="closeMuniPanel()">✕</button>
+                    <div id="muni-header">
+                        <div id="muni-name">–</div>
+                        <div id="muni-meta"></div>
+                        <div id="muni-pop-badge">–</div>
+                    </div>
+                    <div id="tab-bar">
+                        <button class="tab-btn active" data-tab="demo" data-it="Popolazione" data-en="Population" onclick="switchTab(this,'demo')">Population</button>
+                        <button class="tab-btn" data-tab="agr" data-it="Agricoltura" data-en="Agriculture" onclick="switchTab(this,'agr')">Agriculture</button>
+                        <button class="tab-btn" data-tab="man" data-it="Manifatturiero" data-en="Manufacturing" onclick="switchTab(this,'man')">Manufacturing</button>
+                        <button class="tab-btn" data-tab="tra" data-it="Trasporti" data-en="Transport" onclick="switchTab(this,'tra')">Transport</button>
+                        <button class="tab-btn" data-tab="infra" data-it="Infrastrutture" data-en="Infrastructure" onclick="switchTab(this,'infra')">Infrastructure</button>
+                    </div>
+                    <div id="charts-area">
+                        <div id="tab-demo" class="chart-section active">
+                            <div class="kpi-row" id="demo-kpis"></div>
+                            <div class="chart-title" data-it="Distribuzione per fascia d'età" data-en="Age Group Distribution">Age Group Distribution</div>
+                            <div class="chart-wrapper"><canvas id="chart-age"></canvas></div>
+
+                        </div>
+                        <div id="tab-agr" class="chart-section">
+                            <div class="kpi-row" id="agr-kpis"></div>
+                            <div class="chart-title" data-it="Imprese per numero di addetti" data-en="Firms by Employee Size">Firms by Employee Size</div>
+                            <div class="chart-wrapper"><canvas id="chart-agr"></canvas></div>
+                        </div>
+                        <div id="tab-man" class="chart-section">
+                            <div class="kpi-row" id="man-kpis"></div>
+                            <div class="chart-title" data-it="Imprese per numero di addetti" data-en="Firms by Employee Size">Firms by Employee Size</div>
+                            <div class="chart-wrapper"><canvas id="chart-man"></canvas></div>
+                        </div>
+                        <div id="tab-tra" class="chart-section">
+                            <div class="kpi-row" id="tra-kpis"></div>
+                            <div class="chart-title" data-it="Imprese per numero di addetti" data-en="Firms by Employee Size">Firms by Employee Size</div>
+                            <div class="chart-wrapper"><canvas id="chart-tra"></canvas></div>
+                        </div>
+                        <div id="tab-infra" class="chart-section">
+                            <div id="infra-card" style="padding:10px 4px 4px;">
+                                <div class="infra-row" style="display:flex;gap:8px;margin-bottom:8px;">
+                                    <div class="kpi-box" style="flex:1;"><div class="kv" id="infra-sector">–</div><div class="kl" data-it="Settore" data-en="Sector">Sector</div></div>
+                                    <div class="kpi-box" style="flex:1;"><div class="kv" id="infra-cod">–</div><div class="kl" data-it="Codice" data-en="Code">Code</div></div>
+                                    <div class="kpi-box" style="flex:1;"><div class="kv" id="infra-type-icon">–</div><div class="kl" data-it="Tipo" data-en="Type">Type</div></div>
+                                </div>
+                                <div style="background:#0f2218;border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+                                    <div style="font-size:9px;color:#4a7a5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;" data-it="Fase e Tempistica" data-en="Phase & Timeline">Phase & Timeline</div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                                        <div id="infra-fase-badge" style="font-size:11px;color:#a8d5b5;font-weight:600;">–</div>
+                                        <div id="infra-tempistica" style="font-size:11px;font-weight:600;color:#c8f0d4;">–</div>
+                                    </div>
+                                </div>
+                                <div style="background:#0f2218;border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+                                    <div style="font-size:9px;color:#4a7a5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;" data-it="Tipologia intervento" data-en="Intervention Type">Intervention Type</div>
+                                    <div id="infra-tipologia" style="font-size:11px;color:#c8f0d4;font-weight:600;">–</div>
+                                </div>
+                                <div style="background:#0f2218;border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+                                    <div style="font-size:9px;color:#4a7a5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;" data-it="Periodo" data-en="Period">Period</div>
+                                    <div style="display:flex;align-items:center;gap:6px;">
+                                        <span id="infra-start" style="font-size:11px;color:#a8d5b5;font-weight:700;">–</span>
+                                        <div id="infra-timeline-bar" style="flex:1;height:5px;background:#1e3a2a;border-radius:3px;overflow:hidden;">
+                                            <div id="infra-timeline-fill" style="height:100%;background:linear-gradient(90deg,#2d8a5a,#7ad5a0);border-radius:3px;width:50%;"></div>
+                                        </div>
+                                        <span id="infra-end" style="font-size:11px;color:#a8d5b5;font-weight:700;">–</span>
+                                    </div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px;">
+                                    <div class="kpi-box"><div class="kv" id="infra-costo">–</div><div class="kl" data-it="Costo (€)" data-en="Cost (€)">Cost (€)</div></div>
+                                    <div class="kpi-box"><div class="kv" id="infra-risorse">–</div><div class="kl" data-it="Risorse (€)" data-en="Resources (€)">Resources (€)</div></div>
+                                    <div class="kpi-box"><div class="kv" id="infra-fabbisogno">–</div><div class="kl" data-it="Fabbisogno (%)" data-en="Funding Gap (%)">Funding Gap (%)</div></div>
+                                </div>
+                                <div style="background:#0f2218;border-radius:6px;padding:8px 10px;">
+                                    <div style="font-size:9px;color:#4a7a5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;" data-it="Commissionato" data-en="Commissioned">Commissioned</div>
+                                    <div id="infra-commiss" style="font-size:11px;font-weight:600;color:#c8f0d4;">–</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTER PANEL (positioned by JS) -->
+        <div id="filter-panel">
+            <div id="filter-panel-header">
+                <span><i class="fas fa-filter"></i> Filter Infrastructure</span>
+                <div style="display:flex;gap:5px;">
+                    <button id="filter-apply-btn" onclick="applyFilters()" style="background:#1a4a2a;border:1px solid #4a8a5a;color:#a8d5b5;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;font-weight:700;">Apply</button>
+                    <button id="filter-reset-btn" onclick="resetFilters()">Reset</button>
+                </div>
+            </div>
+            <div id="filter-body">
+                <div class="filter-group">
+                    <div class="filter-label">Search by Name / Code / Sector</div>
+                    <input class="filter-input" id="f-text-search" type="text" placeholder="e.g. Cuneo, SS231, Ferrovia…" style="width:100%;box-sizing:border-box;" oninput="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Start Year (Inizio)</div>
+                    <div class="filter-range">
+                        <input class="filter-input" id="f-inizio-min" type="number" placeholder="From" oninput="applyFilters()">
+                        <span class="filter-sep">–</span>
+                        <input class="filter-input" id="f-inizio-max" type="number" placeholder="To" oninput="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">End Year (Fine)</div>
+                    <div class="filter-range">
+                        <input class="filter-input" id="f-fine-min" type="number" placeholder="From" oninput="applyFilters()">
+                        <span class="filter-sep">–</span>
+                        <input class="filter-input" id="f-fine-max" type="number" placeholder="To" oninput="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Cost € (Costo)</div>
+                    <div class="filter-range">
+                        <input class="filter-input" id="f-costo-min" type="number" placeholder="Min e.g. 1000000" oninput="applyFilters()">
+                        <span class="filter-sep">–</span>
+                        <input class="filter-input" id="f-costo-max" type="number" placeholder="Max €" oninput="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Resources € (Risorse)</div>
+                    <div class="filter-range">
+                        <input class="filter-input" id="f-risorse-min" type="number" placeholder="Min €" oninput="applyFilters()">
+                        <span class="filter-sep">–</span>
+                        <input class="filter-input" id="f-risorse-max" type="number" placeholder="Max €" oninput="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Funding Gap % (Fabbisogno)</div>
+                    <div class="filter-range">
+                        <input class="filter-input" id="f-fabb-min" type="number" placeholder="Min %" oninput="applyFilters()">
+                        <span class="filter-sep">–</span>
+                        <input class="filter-input" id="f-fabb-max" type="number" placeholder="Max %" oninput="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Phase (Fase)</div>
+                    <div class="filter-checks" id="f-fase-checks"></div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Type (Tipologia)</div>
+                    <div class="filter-checks" id="f-tipo-checks"></div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Timeline (Tempistica)</div>
+                    <div class="filter-checks" id="f-tempi-checks"></div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-label">Commissioned (Commiss)</div>
+                    <div class="filter-checks" id="f-commiss-checks">
+                        <label class="filter-check"><input type="checkbox" value="1" onchange="applyFilters()"><span>✓ Yes</span></label>
+                        <label class="filter-check"><input type="checkbox" value="0" onchange="applyFilters()"><span>✗ No</span></label>
+                    </div>
+                </div>
+            </div>
+            <div id="filter-results">
+                <div id="filter-results-title">Matching Projects</div>
+                <div id="filter-count"></div>
+                <div id="filter-results-list"></div>
+                <div id="filter-debug" style="margin-top:8px;padding:8px;background:#0a0a0a;border:1px solid #ff6600;border-radius:4px;font-size:9px;color:#ff9944;font-family:monospace;white-space:pre-wrap;display:none;max-height:200px;overflow-y:auto;"></div>
+            </div>
+        </div>
+
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="data/Sedi_Attive_2025_H_Trasporto_magazzinaggio_1.js"></script>
+        <script src="data/Sedi_Attive_2025_C_Attivita_manifatturiere_2.js"></script>
+        <script src="data/Sedi_Attive_2025_A_Agricoltura_3.js"></script>
+        <script src="data/Analisi_Demografica_Cuneo_4.js"></script>
+        <script src="data/Tracciati_opere_CN__strada_ferrovia_rev_1.js"></script>
+        <script src="data/Tracciati_opere_CN__punti_2.js"></script>
+        <script>
+        // === INFRA DATA — declared here so onchange/onclick handlers never crash ===
+        // Populated after map init (line ~890). Guard in applyFilters handles null state.
+        var allRoadFeatures  = (typeof json_Tracciati_opere_CN__strada_ferrovia_rev_1 !== 'undefined')
+            ? json_Tracciati_opere_CN__strada_ferrovia_rev_1.features.slice(0) : null;
+        var allPointFeatures = (typeof json_Tracciati_opere_CN__punti_2 !== 'undefined')
+            ? json_Tracciati_opere_CN__punti_2.features.slice(0) : null;
+
+        // === LANGUAGE ===
+        var currentLang = 'en';
+        function setLang(lang) {
+            currentLang = lang;
+            // Update navbar lang buttons
+            document.querySelectorAll('.nav-lang-btn').forEach(function(b){ b.classList.remove('active'); if(b.textContent.toLowerCase()===lang) b.classList.add('active'); });
+            // Update all data-it/data-en elements
+            document.querySelectorAll('[data-it]').forEach(function(el){ el.textContent = lang==='it'?el.dataset.it:el.dataset.en; });
+            document.getElementById('sidebar-title').textContent = lang==='it'?'Provincia di Cuneo – Dashboard':'Cuneo Province – Dashboard';
+            document.getElementById('sidebar-sub').textContent = lang==='it'?'Clicca un comune per visualizzare i dati':'Click a municipality to view data';
+        }
+        // === OVERLAYS ===
+        function openOverlay(id){ document.getElementById(id).classList.add('open'); }
+        function closeOverlay(id){ document.getElementById(id).classList.remove('open'); }
+        function closeOverlayBackdrop(e,el){ if(e.target===el) el.classList.remove('open'); }
+
+        // === DATA LOOKUP ===
+        var demoByCode={}, agrByCode={}, manByCode={}, traByCode={};
+
+        // === CHART INSTANCES ===
+        var chartAge=null, chartAgr=null, chartMan=null, chartTra=null;
+
+        function makeBarChart(canvasId, labels, data, titleStr) {
+            var ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type:'bar',
+                data:{
+                    labels:labels,
+                    datasets:[{
+                        label:titleStr, data:data,
+                        backgroundColor: labels.map(function(_,i){ return 'hsla('+(130+i*12)+',50%,'+(40+i*2)+'%,0.8)'; }),
+                        borderColor: labels.map(function(_,i){ return 'hsla('+(130+i*12)+',50%,55%,1)'; }),
+                        borderWidth:1, borderRadius:4
+                    }]
+                },
+                options:{
+                    responsive:true, maintainAspectRatio:true,
+                    plugins:{
+                        legend:{display:false},
+                        tooltip:{ backgroundColor:'#0d1a12', borderColor:'#2d5a3d', borderWidth:1, titleColor:'#a8d5b5', bodyColor:'#c8f0d4' }
+                    },
+                    scales:{
+                        x:{ ticks:{color:'#4a7a5a',font:{size:10},maxRotation:40}, grid:{color:'rgba(255,255,255,0.05)'} },
+                        y:{ ticks:{color:'#4a7a5a',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'} }
+                    }
+                }
+            });
+        }
+
+        function fmt(v) {
+            if(v==null||v===''||isNaN(Number(v))) return '–';
+            return Number(v).toLocaleString('it-IT');
+        }
+
+        function switchTab(btn, tabId) {
+            document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+            btn.classList.add('active');
+            document.querySelectorAll('.chart-section').forEach(function(s){s.classList.remove('active');});
+            document.getElementById('tab-'+tabId).classList.add('active');
+        }
+
+        var selectedLayer = null;
+        var defaultStyle = { fillColor:'#f0f4f1', color:'#2d5a3d', weight:1, fillOpacity:0.85 };
+        var hoverStyle   = { fillColor:'#4a8a5a', color:'#1a3a2a', weight:2, fillOpacity:0.95 };
+        var selectedStyle= { fillColor:'#2a6a3a', color:'#a8d5b5', weight:2.5, fillOpacity:1 };
+
+        function closeMuniPanel() {
+            document.getElementById('empty-state').style.display='block';
+            document.getElementById('muni-panel').style.display='none';
+            if(selectedLayer){ try { selectedLayer.setStyle(defaultStyle); } catch(e){} selectedLayer=null; }
+        }
+
+        function buildKpis(containerId, items) {
+            var el=document.getElementById(containerId); el.innerHTML='';
+            items.forEach(function(item){ el.innerHTML+='<div class="kpi-box"><div class="kv">'+item.v+'</div><div class="kl">'+item.l+'</div></div>'; });
+        }
+
+        function showPanel(name, code, tab) {
+            document.getElementById('empty-state').style.display='none';
+            document.getElementById('muni-panel').style.display='flex';
+            document.getElementById('muni-name').textContent = name;
+            document.getElementById('muni-meta').textContent = (currentLang==='it'?'Codice: ':'Code: ')+code;
+            document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+            document.querySelector('.tab-btn[data-tab="'+tab+'"]').classList.add('active');
+            document.querySelectorAll('.chart-section').forEach(function(s){s.classList.remove('active');});
+            document.getElementById('tab-'+tab).classList.add('active');
+        }
+
+        function openDemoPanel(props, layer) {
+            if(selectedLayer && selectedLayer!==layer){ try{selectedLayer.setStyle(defaultStyle);}catch(e){} }
+            selectedLayer=layer; try{layer.setStyle(selectedStyle);}catch(e){}
+            var name = props['Nome del comune']||'';
+            var code = props['Codice comunale']||'';
+            var pop  = props['Popolazione nel 2023']||props['Popolazione nel 2022']||'–';
+            document.getElementById('muni-pop-badge').textContent = '\uD83D\uDC65 Pop: '+fmt(pop);
+            showPanel(name, code, 'demo');
+            var ageLabels=['0-14','15-29','30-44','45-59','60-74','75+'];
+            var ageKeys=['Numero di persone da 0 a 14 anni','Numero di persone da 15 a 29 anni','Numero di persone da 30 a 44 anni','Numero di persone da 45 a 59 anni','Numero di persone da 60 a 74 anni','Numero di persone di 75 anni o più'];
+            var ageData=ageKeys.map(function(k){return Number(props[k])||0;});
+            buildKpis('demo-kpis',[
+                {v:fmt(pop),l:currentLang==='it'?'Popolazione':'Population'},
+                {v:fmt(props['Superficie en km\u00b2']),l:'km\u00b2'},
+                {v:fmt(props['Popolazione nel 2022']),l:'Pop. 2022'}
+            ]);
+            if(chartAge) chartAge.destroy();
+            chartAge = makeBarChart('chart-age', ageLabels, ageData, currentLang==='it'?'Persone':'People');
+        }
+
+        function openBizPanel(props, layer, tab, chartId, chartVar) {
+            if(selectedLayer && selectedLayer!==layer){ try{selectedLayer.setStyle(defaultStyle);}catch(e){} }
+            selectedLayer=layer; try{layer.setStyle(selectedStyle);}catch(e){}
+            var name = props['Nome del comune']||props['Comune_1']||'';
+            var code = props['Codice del comune']||'';
+            var total = props['Grand Totale']||'–';
+            document.getElementById('muni-pop-badge').textContent = '\uD83C\uDFED Tot: '+fmt(total);
+            showPanel(name, code, tab);
+            var bizKeys=['0 addetti','1 addetto','2-5 addetti','6-9 addetti','10-19 addetti','20-49 addetti','50-99 addetti','100-249 addetti','250-499 ad','pi\u00c3\u00b9 di 500 addetti'];
+            var bizLabels=['0','1','2-5','6-9','10-19','20-49','50-99','100-249','250-499','500+'];
+            var bizData=bizKeys.map(function(k){return Number(props[k])||0;});
+            var kpiId = tab+'-kpis';
+            buildKpis(kpiId,[
+                {v:fmt(total),l:currentLang==='it'?'Tot. Imprese':'Total Firms'},
+                {v:fmt(props['1 addetto']),l:'1 emp.'},
+                {v:fmt(props['2-5 addetti']),l:'2-5 emp.'}
+            ]);
+            if(window[chartVar]) window[chartVar].destroy();
+            window[chartVar] = makeBarChart(chartId, bizLabels, bizData, currentLang==='it'?'Imprese':'Firms');
+        }
+
+        function openMuniPanel(props, layer, startTab) { openDemoPanel(props, layer); }
+
+        function fmtMoney(v) {
+            if(!v||v===''||v==='0'||v==='0.00') return '–';
+            var n = parseFloat(String(v).replace(/,/g,''));
+            if(isNaN(n)) return v;
+            if(n>=1000000) return (n/1000000).toFixed(1)+'M€';
+            if(n>=1000) return (n/1000).toFixed(0)+'K€';
+            return n.toFixed(0)+'€';
+        }
+
+        function openInfraPanel(props, layer, featureType) {
+            // featureType: 'road' or 'point'
+            document.getElementById('empty-state').style.display='none';
+            document.getElementById('muni-panel').style.display='flex';
+
+            if(selectedLayer && selectedLayer!==layer){ try{selectedLayer.setStyle(defaultStyle);}catch(e){} }
+            selectedLayer = layer;
+            try {
+                if(featureType==='road') layer.setStyle({color:'#ffdd44', weight:4});
+                else layer.setStyle({fillColor:'#ffdd44', fillOpacity:1, radius:8});
+            } catch(e){}
+
+            // Field name prefix differs between layers
+            var pre = featureType==='road' ? 'Tracciati_' : 'Punti_Cuneo_';
+            var nome    = props[pre+'Nome']    || props['Nome']   || '–';
+            var settore = props[pre+'Settore'] || props['Settore']|| '–';
+            var cod     = props[pre+'Cod']     || props['Codice'] || '–';
+            var inizio  = props[pre+'Inizio (anno)'] || '–';
+            var fine    = props[pre+'Fine (anno)']   || '–';
+            var costo   = props[pre+'Costo (\u20ac)']   || '–';
+            var risorse = props[pre+'Risorse (\u20ac)'] || '–';
+            var fabb    = props[pre+'Fabbisogno (%)']  || '0';
+            var tipo    = props[pre+'Tipologia intervento'] || '–';
+            var fase    = props[pre+'Fase']       || '–';
+            var commiss = props[pre+'Commiss']    || '0';
+            var tempi   = props[pre+'Tempistica'] || '–';
+
+            // Header
+            document.getElementById('muni-name').textContent = nome;
+            document.getElementById('muni-meta').textContent = (currentLang==='it'?'Settore: ':'Sector: ')+settore;
+            var icon = settore==='Ferrovia' ? '🚂' : featureType==='road' ? '🛣' : '⛰';
+            document.getElementById('muni-pop-badge').textContent = icon+' '+(currentLang==='it'?'Cod: ':'Code: ')+cod;
+
+            // Switch to infra tab
+            showPanel(nome, cod, 'infra');
+
+            // Fill infra card
+            document.getElementById('infra-sector').textContent = settore;
+            document.getElementById('infra-cod').textContent = cod;
+            document.getElementById('infra-type-icon').textContent = settore==='Ferrovia' ? '🚂 Railway' : featureType==='point' ? '⛰ Tunnel' : '🛣 Road';
+
+            // Phase badge with color
+            var faseEl = document.getElementById('infra-fase-badge');
+            faseEl.textContent = fase||'–';
+            faseEl.style.color = fase.indexOf('esercizio')>-1||fase.indexOf('linea')>-1 ? '#7ad5a0' :
+                                  fase.indexOf('corso')>-1 ? '#f0c060' : '#a8d5b5';
+
+            // Tempistica with color
+            var tempiEl = document.getElementById('infra-tempistica');
+            tempiEl.textContent = tempi||'–';
+            tempiEl.style.color = tempi.indexOf('grave')>-1 ? '#e07050' :
+                                   tempi.indexOf('ritardo')>-1 ? '#e0a050' :
+                                   tempi.indexOf('linea')>-1 ? '#7ad5a0' : '#c8f0d4';
+
+            document.getElementById('infra-tipologia').textContent = tipo;
+
+            // Timeline
+            document.getElementById('infra-start').textContent = inizio!=='–'?inizio:'?';
+            document.getElementById('infra-end').textContent   = fine!=='–'?fine:'?';
+            var pct = 50;
+            if(inizio!=='–' && fine!=='–') {
+                var now = new Date().getFullYear();
+                var s = parseInt(inizio), e = parseInt(fine);
+                if(!isNaN(s)&&!isNaN(e)&&e>s) pct = Math.min(100,Math.max(0,Math.round((now-s)/(e-s)*100)));
+            }
+            document.getElementById('infra-timeline-fill').style.width = pct+'%';
+
+            // Costs
+            document.getElementById('infra-costo').textContent    = fmtMoney(costo);
+            document.getElementById('infra-risorse').textContent  = fmtMoney(risorse);
+            document.getElementById('infra-fabbisogno').textContent = fabb!=='0'&&fabb!=='0.00' ? fabb+'%' : '0%';
+
+            // Commissioned
+            var commEl = document.getElementById('infra-commiss');
+            commEl.textContent = commiss==='1'||commiss===1 ? (currentLang==='it'?'✓ Sì':'✓ Yes') : (currentLang==='it'?'✗ No':'✗ No');
+            commEl.style.color = (commiss==='1'||commiss===1) ? '#7ad5a0' : '#e07050';
+        }
+
+        // === MAP ===
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer=e.target;
+            if(e.target.feature.geometry.type==='LineString'||e.target.feature.geometry.type==='MultiLineString'){
+                highlightLayer.setStyle({color:'rgba(255,255,0,1.00)'});
+            } else {
+                if(e.target!==selectedLayer) highlightLayer.setStyle({fillColor:'#4a8a5a',fillOpacity:0.95});
+            }
+        }
+        var map=L.map('map',{zoomControl:false,maxZoom:28,minZoom:1}).fitBounds([[43.86382618944492,6.4964438047886635],[45.01831113449966,8.6370126301097]]);
+        var hash=new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker=new Autolinker({truncate:{length:30,location:'smart'}});
+        function removeEmptyRowsFromPopupContent(content,feature){var tempDiv=document.createElement('div');tempDiv.innerHTML=content;var rows=tempDiv.querySelectorAll('tr');for(var i=0;i<rows.length;i++){var td=rows[i].querySelector('td.visible-with-data');var key=td?td.id:'';if(td&&td.classList.contains('visible-with-data')&&feature.properties[key]==null){rows[i].parentNode.removeChild(rows[i]);}}return tempDiv.innerHTML;}
+        function addClassToPopupIfMedia(content,popup){var tempDiv=document.createElement('div');tempDiv.innerHTML=content;var imgTd=tempDiv.querySelector('td img');if(imgTd){var src=imgTd.getAttribute('src');if(/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)){popup._contentNode.classList.add('media');setTimeout(function(){popup.update();},10);}}else{popup._contentNode.classList.remove('media');}}
+
+        try{document.getElementsByClassName('leaflet-control-measure-toggle')[0].className+=' fas fa-ruler';}catch(e){}
+        var bounds_group=new L.featureGroup([]);
+        function setBounds(){}
+
+        map.createPane('pane_OSMStandard_0'); map.getPane('pane_OSMStandard_0').style.zIndex=400;
+        var layer_OSMStandard_0=L.tileLayer('http://tile.openstreetmap.org/{z}/{x}/{y}.png',{pane:'pane_OSMStandard_0',opacity:0.6,attribution:'<a href="https://www.openstreetmap.org/copyright">\u00a9 OpenStreetMap contributors, CC-BY-SA</a>',minZoom:1,maxZoom:28,minNativeZoom:0,maxNativeZoom:19});
+        map.addLayer(layer_OSMStandard_0);
+
+        // TRANSPORT
+        function pop_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1(feature,layer){
+            layer.on({
+                mouseover:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'#c8a87a',fillOpacity:0.95}); },
+                mouseout:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'rgba(214,170,141,1.0)',fillOpacity:1}); },
+                click:function(e){ openBizPanel(feature.properties, e.target, 'tra', 'chart-tra', 'chartTra'); L.DomEvent.stopPropagation(e); }
+            });
+        }
+        function style_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1_0(){return{pane:'pane_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1',opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1.0,fill:true,fillOpacity:1,fillColor:'rgba(214,170,141,1.0)',interactive:true};}
+        map.createPane('pane_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1'); map.getPane('pane_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1').style.zIndex=401; map.getPane('pane_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1').style['mix-blend-mode']='normal';
+        var layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1=new L.geoJson(json_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1,{attribution:'',interactive:true,dataVar:'json_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1',layerName:'layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1',pane:'pane_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1',onEachFeature:pop_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1,style:style_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1_0});
+        bounds_group.addLayer(layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1); map.addLayer(layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1);
+
+        // MANUFACTURING
+        function pop_Sedi_Attive_2025_C_Attivita_manifatturiere_2(feature,layer){
+            layer.on({
+                mouseover:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'#a8a870',fillOpacity:0.95}); },
+                mouseout:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'rgba(183,183,142,1.0)',fillOpacity:1}); },
+                click:function(e){ openBizPanel(feature.properties, e.target, 'man', 'chart-man', 'chartMan'); L.DomEvent.stopPropagation(e); }
+            });
+        }
+        function style_Sedi_Attive_2025_C_Attivita_manifatturiere_2_0(){return{pane:'pane_Sedi_Attive_2025_C_Attivita_manifatturiere_2',opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1.0,fill:true,fillOpacity:1,fillColor:'rgba(183,183,142,1.0)',interactive:true};}
+        map.createPane('pane_Sedi_Attive_2025_C_Attivita_manifatturiere_2'); map.getPane('pane_Sedi_Attive_2025_C_Attivita_manifatturiere_2').style.zIndex=402; map.getPane('pane_Sedi_Attive_2025_C_Attivita_manifatturiere_2').style['mix-blend-mode']='normal';
+        var layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2=new L.geoJson(json_Sedi_Attive_2025_C_Attivita_manifatturiere_2,{attribution:'',interactive:true,dataVar:'json_Sedi_Attive_2025_C_Attivita_manifatturiere_2',layerName:'layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2',pane:'pane_Sedi_Attive_2025_C_Attivita_manifatturiere_2',onEachFeature:pop_Sedi_Attive_2025_C_Attivita_manifatturiere_2,style:style_Sedi_Attive_2025_C_Attivita_manifatturiere_2_0});
+        bounds_group.addLayer(layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2); map.addLayer(layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2);
+
+        // AGRICULTURE
+        function pop_Sedi_Attive_2025_A_Agricoltura_3(feature,layer){
+            layer.on({
+                mouseover:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'#55aa55',fillOpacity:0.95}); },
+                mouseout:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'rgba(122,182,122,1.0)',fillOpacity:1}); },
+                click:function(e){ openBizPanel(feature.properties, e.target, 'agr', 'chart-agr', 'chartAgr'); L.DomEvent.stopPropagation(e); }
+            });
+        }
+        function style_Sedi_Attive_2025_A_Agricoltura_3_0(){return{pane:'pane_Sedi_Attive_2025_A_Agricoltura_3',opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1.0,fill:true,fillOpacity:1,fillColor:'rgba(122,182,122,1.0)',interactive:true};}
+        map.createPane('pane_Sedi_Attive_2025_A_Agricoltura_3'); map.getPane('pane_Sedi_Attive_2025_A_Agricoltura_3').style.zIndex=403; map.getPane('pane_Sedi_Attive_2025_A_Agricoltura_3').style['mix-blend-mode']='normal';
+        var layer_Sedi_Attive_2025_A_Agricoltura_3=new L.geoJson(json_Sedi_Attive_2025_A_Agricoltura_3,{attribution:'',interactive:true,dataVar:'json_Sedi_Attive_2025_A_Agricoltura_3',layerName:'layer_Sedi_Attive_2025_A_Agricoltura_3',pane:'pane_Sedi_Attive_2025_A_Agricoltura_3',onEachFeature:pop_Sedi_Attive_2025_A_Agricoltura_3,style:style_Sedi_Attive_2025_A_Agricoltura_3_0});
+        bounds_group.addLayer(layer_Sedi_Attive_2025_A_Agricoltura_3); map.addLayer(layer_Sedi_Attive_2025_A_Agricoltura_3);
+
+        // DEMOGRAPHIC – INTERACTIVE
+        function pop_Analisi_Demografica_Cuneo_4(feature,layer){
+            var code=feature.properties['Codice del comune']||feature.properties['Codice comunale']||'';
+            if(code) demoByCode[code]=feature.properties;
+            layer.on({
+                mouseover:function(e){
+                    if(e.target!==selectedLayer) e.target.setStyle(hoverStyle);
+                    var p=feature.properties;
+                    var name=p['Nome del comune']||'';
+                    var pop=p['Popolazione nel 2023']||p['Popolazione nel 2022']||'–';
+                    var agrT=(agrByCode[code]||{})['Grand Totale']||'–';
+                    var manT=(manByCode[code]||{})['Grand Totale']||'–';
+                    var traT=(traByCode[code]||{})['Grand Totale']||'–';
+                    e.target.bindTooltip('<div class="custom-tooltip-inner"><strong>'+name+'</strong><br>'+(currentLang==='it'?'Popolazione':'Population')+': '+fmt(pop)+'<br>Agr: '+fmt(agrT)+' | Man: '+fmt(manT)+' | Tra: '+fmt(traT)+'</div>',{sticky:true,direction:'top',className:''}).openTooltip(e.latlng);
+                },
+                mouseout:function(e){
+                    if(e.target!==selectedLayer) e.target.setStyle(defaultStyle);
+                    e.target.closeTooltip();
+                },
+                click:function(e){
+                    openDemoPanel(feature.properties, e.target);
+                    L.DomEvent.stopPropagation(e);
+                }
+            });
+        }
+        function style_Analisi_Demografica_Cuneo_4_0(){return{pane:'pane_Analisi_Demografica_Cuneo_4',opacity:1,color:'#2d5a3d',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1.0,fill:true,fillOpacity:0.85,fillColor:'#f0f4f1',interactive:true};}
+        map.createPane('pane_Analisi_Demografica_Cuneo_4'); map.getPane('pane_Analisi_Demografica_Cuneo_4').style.zIndex=404; map.getPane('pane_Analisi_Demografica_Cuneo_4').style['mix-blend-mode']='normal';
+        var layer_Analisi_Demografica_Cuneo_4=new L.geoJson(json_Analisi_Demografica_Cuneo_4,{attribution:'',interactive:true,dataVar:'json_Analisi_Demografica_Cuneo_4',layerName:'layer_Analisi_Demografica_Cuneo_4',pane:'pane_Analisi_Demografica_Cuneo_4',onEachFeature:pop_Analisi_Demografica_Cuneo_4,style:style_Analisi_Demografica_Cuneo_4_0});
+        bounds_group.addLayer(layer_Analisi_Demografica_Cuneo_4); map.addLayer(layer_Analisi_Demografica_Cuneo_4);
+
+
+        // ROADS & RAILWAYS — interactive, opens Infrastructure dashboard on click
+        // Railway = blue line, Road = red line, different legend colors
+        function getInfraColor(props) {
+            var settore = props['Tracciati_Settore']||props['Settore']||'';
+            return settore==='Ferrovia' ? 'rgba(60,120,200,1.0)' : 'rgba(183,72,75,1.0)';
+        }
+        function pop_Tracciati_opere_CN__strada_ferrovia_rev_1(feature,layer){
+            layer.on({
+                mouseover:function(e){ e.target.setStyle({color:'#ffee88',weight:4}); },
+                mouseout:function(e){ if(e.target!==selectedLayer) e.target.setStyle({color:getInfraColor(feature.properties),weight:2.0}); },
+                click:function(e){ openInfraPanel(feature.properties, e.target, 'road'); L.DomEvent.stopPropagation(e); }
+            });
+        }
+        function style_Tracciati_opere_CN__strada_ferrovia_rev_1_0(feature){
+            return {pane:'pane_Tracciati_opere_CN__strada_ferrovia_rev_1',opacity:1,color:getInfraColor(feature?feature.properties:{}),dashArray: (feature&&(feature.properties['Tracciati_Settore']||feature.properties['Settore'])==='Ferrovia')?'6,4':'',lineCap:'square',lineJoin:'bevel',weight:2.0,fillOpacity:0,interactive:true};
+        }
+        map.createPane('pane_Tracciati_opere_CN__strada_ferrovia_rev_1'); map.getPane('pane_Tracciati_opere_CN__strada_ferrovia_rev_1').style.zIndex=405; map.getPane('pane_Tracciati_opere_CN__strada_ferrovia_rev_1').style['mix-blend-mode']='normal';
+        var layer_Tracciati_opere_CN__strada_ferrovia_rev_1=new L.geoJson(json_Tracciati_opere_CN__strada_ferrovia_rev_1,{attribution:'',interactive:true,dataVar:'json_Tracciati_opere_CN__strada_ferrovia_rev_1',layerName:'layer_Tracciati_opere_CN__strada_ferrovia_rev_1',pane:'pane_Tracciati_opere_CN__strada_ferrovia_rev_1',onEachFeature:pop_Tracciati_opere_CN__strada_ferrovia_rev_1,style:style_Tracciati_opere_CN__strada_ferrovia_rev_1_0});
+        bounds_group.addLayer(layer_Tracciati_opere_CN__strada_ferrovia_rev_1); map.addLayer(layer_Tracciati_opere_CN__strada_ferrovia_rev_1);
+
+        // TUNNEL/PASS POINTS — interactive, opens Infrastructure dashboard on click
+        function pop_Tracciati_opere_CN__punti_2(feature,layer){
+            layer.on({
+                mouseover:function(e){ e.target.setStyle({fillColor:'#ffee88',fillOpacity:1,radius:8}); },
+                mouseout:function(e){ if(e.target!==selectedLayer) e.target.setStyle({fillColor:'rgba(225,89,137,1.0)',fillOpacity:1,radius:6}); },
+                click:function(e){ openInfraPanel(feature.properties, e.target, 'point'); L.DomEvent.stopPropagation(e); }
+            });
+        }
+        function style_Tracciati_opere_CN__punti_2_0(){return{pane:'pane_Tracciati_opere_CN__punti_2',radius:6,opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1,fill:true,fillOpacity:1,fillColor:'rgba(225,89,137,1.0)',interactive:true};}
+        map.createPane('pane_Tracciati_opere_CN__punti_2'); map.getPane('pane_Tracciati_opere_CN__punti_2').style.zIndex=406; map.getPane('pane_Tracciati_opere_CN__punti_2').style['mix-blend-mode']='normal';
+        var layer_Tracciati_opere_CN__punti_2=new L.geoJson(json_Tracciati_opere_CN__punti_2,{attribution:'',interactive:true,dataVar:'json_Tracciati_opere_CN__punti_2',layerName:'layer_Tracciati_opere_CN__punti_2',pane:'pane_Tracciati_opere_CN__punti_2',onEachFeature:pop_Tracciati_opere_CN__punti_2,pointToLayer:function(feature,latlng){return L.circleMarker(latlng,style_Tracciati_opere_CN__punti_2_0(feature));}});
+        bounds_group.addLayer(layer_Tracciati_opere_CN__punti_2); map.addLayer(layer_Tracciati_opere_CN__punti_2);
+
+        // CONTROLS
+        L.control.zoom({position:'topleft'}).addTo(map);
+        new L.Control.Measure({position:'topleft',primaryLengthUnit:'meters',secondaryLengthUnit:'kilometers',primaryAreaUnit:'sqmeters',secondaryAreaUnit:'hectares'}).addTo(map);
+
+        var title=new L.Control({'position':'topright'});
+        title.onAdd=function(map){this._div=L.DomUtil.create('div','info');this._div.innerHTML='<h2>Provincia di Cuneo</h2>';return this._div;};
+        title.addTo(map);
+
+        var abstract=new L.Control({'position':'bottomright'});
+        abstract.onAdd=function(map){this._div=L.DomUtil.create('div','leaflet-control abstract');this._div.id='abstract';abstract.show();return this._div;};
+        abstract.show=function(){this._div.classList.remove("abstract");this._div.classList.add("abstractUncollapsed");this._div.innerHTML='WebGIS Cuneo – Dashboard demografica e imprenditoriale';};
+        abstract.addTo(map);
+
+        var photonControl=L.control.photon({url:"https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",feedbackLabel:'',position:'topleft',includePosition:true,initial:true}).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px";
+        var x=null,obj2={gcd:null},obj3={marker:null};
+        photonControl.on('selected',function(e){
+            if(x!=null){try{map.removeLayer(obj3.marker);}catch(err){} map.removeLayer(x);}
+            obj2.gcd=e.choice; x=L.geoJSON(obj2.gcd).addTo(map);
+            var label=typeof obj2.gcd.properties.label==='undefined'?obj2.gcd.properties.display_name:obj2.gcd.properties.label;
+            obj3.marker=L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(),17);
+            e.target.input.value=typeof e.choice.properties.label==='undefined'?e.choice.properties.display_name:e.choice.properties.label;
+        });
+        var search=document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        if(search){
+            search.classList.add("leaflet-control-search"); search.style.display="flex"; search.style.backgroundColor="rgba(255,255,255,0.5)";
+            var btn=document.createElement("div"); btn.id="gcd-button-control"; btn.className="gcd-gl-btn fa fa-search search-button";
+            search.insertBefore(btn,search.firstChild);
+            var last=search.lastChild; last.style.display="none";
+            btn.addEventListener("click",function(){last.style.display=last.style.display==="none"?"block":"none";});
+        }
+
+        // Add filter button as Leaflet control below search
+        var FilterControl = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd: function(map) {
+                var container = L.DomUtil.create('div', 'leaflet-control leaflet-bar');
+                container.style.background = 'none';
+                container.style.border = 'none';
+                container.style.boxShadow = 'none';
+                var btn = L.DomUtil.create('div', '', container);
+                btn.id = 'filter-toggle-btn';
+                btn.title = 'Filter Infrastructure';
+                btn.innerHTML = '<i class="fas fa-filter"></i>';
+                L.DomEvent.on(btn, 'click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    toggleFilterPanel();
+                });
+                L.DomEvent.disableClickPropagation(container);
+                return container;
+            }
+        });
+        new FilterControl().addTo(map);
+
+        var overlaysTree=[
+            {label:'<img src="legend/Tracciati_opere_CN__punti_2.png" /> Tracciati_opere_CN__punti',layer:layer_Tracciati_opere_CN__punti_2},
+            {label:'<img src="legend/Tracciati_opere_CN__strada_ferrovia_rev_1.png" /> Tracciati_opere_CN__strada_ferrovia_rev',layer:layer_Tracciati_opere_CN__strada_ferrovia_rev_1},
+            {label:'<img src="legend/Analisi_Demografica_Cuneo_4.png" /> Analisi_Demografica_Cuneo',layer:layer_Analisi_Demografica_Cuneo_4},
+            {label:'<b>Sedi_Attive_2025</b>',selectAllCheckbox:true,children:[
+                {label:'<img src="legend/Sedi_Attive_2025_A_Agricoltura_3.png" /> Sedi_Attive_2025_A_Agricoltura',layer:layer_Sedi_Attive_2025_A_Agricoltura_3},
+                {label:'<img src="legend/Sedi_Attive_2025_C_Attivita_manifatturiere_2.png" /> Sedi_Attive_2025_C_Attivita_manifatturiere',layer:layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2},
+                {label:'<img src="legend/Sedi_Attive_2025_H_Trasporto_magazzinaggio_1.png" /> Sedi_Attive_2025_H_Trasporto_magazzinaggio',layer:layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1}
+            ]},
+            {label:"OSM Standard",layer:layer_OSMStandard_0}
+        ];
+        L.control.layers.tree(null,overlaysTree,{collapsed:true}).addTo(map);
+        setBounds();
+
+        // Province stats
+        setTimeout(function(){
+            var totalPop=0,totalAgr=0,totalMan=0,totalTra=0;
+            layer_Analisi_Demografica_Cuneo_4.eachLayer(function(l){totalPop+=Number(l.feature.properties['Popolazione nel 2023']||l.feature.properties['Popolazione nel 2022']||0);});
+            layer_Sedi_Attive_2025_A_Agricoltura_3.eachLayer(function(l){totalAgr+=Number(l.feature.properties['Grand Totale']||0);});
+            layer_Sedi_Attive_2025_C_Attivita_manifatturiere_2.eachLayer(function(l){totalMan+=Number(l.feature.properties['Grand Totale']||0);});
+            layer_Sedi_Attive_2025_H_Trasporto_magazzinaggio_1.eachLayer(function(l){totalTra+=Number(l.feature.properties['Grand Totale']||0);});
+            document.getElementById('prov-pop').textContent=(totalPop/1000).toFixed(0)+'k';
+            document.getElementById('prov-agr').textContent=totalAgr.toLocaleString('it-IT');
+            document.getElementById('prov-man').textContent=totalMan.toLocaleString('it-IT');
+            document.getElementById('prov-tra').textContent=totalTra.toLocaleString('it-IT');
+        },600);
+
+        // Labels
+        var labels=[],totalMarkers=0,i=0;
+        layer_Tracciati_opere_CN__strada_ferrovia_rev_1.eachLayer(function(layer){
+            var n=layer.feature.properties['Tracciati_Nome']||layer.feature.properties['Nome']||'';
+            layer.bindTooltip(n?'<div style="color:#323232;font-size:10pt;font-family:Arial,sans-serif;">'+n+'</div>':'',{permanent:true,offset:[-0,-16],className:'css_Tracciati_opere_CN__strada_ferrovia_rev_1'});
+            labels.push(layer);totalMarkers+=1;layer.added=true;addLabel(layer,i);i++;
+        });
+        i=0;
+        layer_Tracciati_opere_CN__punti_2.eachLayer(function(layer){
+            var n=layer.feature.properties['Punti_Cuneo_Nome']||layer.feature.properties['Nome']||'';
+            layer.bindTooltip(n?'<div style="color:#323232;font-size:10pt;font-family:Arial,sans-serif;">'+n+'</div>':'',{permanent:true,offset:[-0,-16],className:'css_Tracciati_opere_CN__punti_2'});
+            labels.push(layer);totalMarkers+=1;layer.added=true;addLabel(layer,i);i++;
+        });
+        resetLabels([layer_Tracciati_opere_CN__strada_ferrovia_rev_1,layer_Tracciati_opere_CN__punti_2]);
+        map.on("zoomend",function(){resetLabels([layer_Tracciati_opere_CN__strada_ferrovia_rev_1,layer_Tracciati_opere_CN__punti_2]);});
+        map.on("layeradd",function(){resetLabels([layer_Tracciati_opere_CN__strada_ferrovia_rev_1,layer_Tracciati_opere_CN__punti_2]);});
+        map.on("layerremove",function(){resetLabels([layer_Tracciati_opere_CN__strada_ferrovia_rev_1,layer_Tracciati_opere_CN__punti_2]);});
+
+        map.on('click',function(){closeMuniPanel();});
+        setTimeout(function(){map.invalidateSize();},100);
+
+        // ============================================================
+        // INFRASTRUCTURE FILTER SYSTEM
+        // Uses clearLayers() + addData() — same reliable approach as QGIS export
+        // No setStyle fighting — we just remove unmatched features from the layers
+        // ============================================================
+
+        // Re-assign now that layers are guaranteed to exist
+        allRoadFeatures  = json_Tracciati_opere_CN__strada_ferrovia_rev_1.features.slice(0);
+        allPointFeatures = json_Tracciati_opere_CN__punti_2.features.slice(0);
+
+        function getProp(props, featureType, field) {
+            var prefix = featureType === 'road' ? 'Tracciati_' : 'Punti_Cuneo_';
+            var v = props[prefix + field];
+            if(v !== undefined && v !== null) return v;
+            v = props[field];
+            return (v !== undefined && v !== null) ? v : '';
+        }
+
+        function parseStrNum(raw) {
+            if(raw === null || raw === undefined) return null;
+            var s = String(raw).trim();
+            if(s === '' || s === 'NULL') return null;
+            s = s.replace(/,(?=\d{3})/g, '');
+            var n = parseFloat(s);
+            return isNaN(n) ? null : n;
+        }
+
+        function getNum(id) {
+            var el = document.getElementById(id);
+            if(!el || el.value.trim() === '') return null;
+            return parseFloat(el.value);
+        }
+
+        function getChecked(containerId) {
+            var vals = [];
+            document.querySelectorAll('#' + containerId + ' input[type=checkbox]:checked')
+                .forEach(function(cb){ vals.push(cb.value); });
+            return vals;
+        }
+
+        // Wrap raw GeoJSON feature for results list display
+        function makeWrapper(geojsonFeature, featureType) {
+            return { props: geojsonFeature.properties, featureType: featureType, geojson: geojsonFeature };
+        }
+
+        // Init checkboxes from full dataset
+        setTimeout(function(){
+            buildFilterCheckboxes();
+            var all = allRoadFeatures.map(function(f){ return makeWrapper(f,'road'); })
+                       .concat(allPointFeatures.map(function(f){ return makeWrapper(f,'point'); }));
+            renderResultsList(all);
+        }, 800);
+
+        function buildFilterCheckboxes() {
+            var faseVals = {}, tipoVals = {}, tempiVals = {};
+            // Fix: was wrongly using undefined 'allInfraFeatures' — use the two real arrays
+            var allWrapped = allRoadFeatures.map(function(f){ return makeWrapper(f,'road'); })
+                             .concat(allPointFeatures.map(function(f){ return makeWrapper(f,'point'); }));
+            allWrapped.forEach(function(f) {
+                var fase  = String(getProp(f.props, f.featureType, 'Fase') || '').trim();
+                var tipo  = String(getProp(f.props, f.featureType, 'Tipologia intervento') || '').trim();
+                var tempi = String(getProp(f.props, f.featureType, 'Tempistica') || '').trim();
+                if(fase)  faseVals[fase]  = true;
+                if(tipo)  tipoVals[tipo]  = true;
+                if(tempi) tempiVals[tempi]= true;
+            });
+            buildCheckboxGroup('f-fase-checks',  Object.keys(faseVals).sort());
+            buildCheckboxGroup('f-tipo-checks',  Object.keys(tipoVals).sort());
+            buildCheckboxGroup('f-tempi-checks', Object.keys(tempiVals).sort());
+            console.log('[Filter] Checkboxes built. Fase:', Object.keys(faseVals));
+        }
+
+        function buildCheckboxGroup(containerId, values) {
+            var el = document.getElementById(containerId);
+            if(!el) return;
+            el.innerHTML = '';
+            values.forEach(function(v) {
+                var label = document.createElement('label');
+                label.className = 'filter-check';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = v;
+                // Fix: dynamic checkboxes need onchange to trigger applyFilters
+                cb.addEventListener('change', function(){ applyFilters(); });
+                var sp = document.createElement('span');
+                sp.textContent = v;
+                label.appendChild(cb);
+                label.appendChild(sp);
+                el.appendChild(label);
+            });
+        }
+
+        function featureMatchesProps(props, featureType) {
+            var ft = featureType;
+
+            var inizio  = parseInt(String(getProp(props, ft, 'Inizio (anno)') || '').trim()) || null;
+            var fine    = parseInt(String(getProp(props, ft, 'Fine (anno)')   || '').trim()) || null;
+            var costo   = parseStrNum(getProp(props, ft, 'Costo (€)'));
+            var risorse = parseStrNum(getProp(props, ft, 'Risorse (€)'));
+            var fabb    = parseStrNum(getProp(props, ft, 'Fabbisogno (%)'));
+            var fase    = String(getProp(props, ft, 'Fase')                   || '').trim();
+            var tipo    = String(getProp(props, ft, 'Tipologia intervento')   || '').trim();
+            var tempi   = String(getProp(props, ft, 'Tempistica')             || '').trim();
+            var commiss = String(getProp(props, ft, 'Commiss')                || '0').trim();
+
+            var iniMin = getNum('f-inizio-min'), iniMax = getNum('f-inizio-max');
+            var finMin = getNum('f-fine-min'),   finMax = getNum('f-fine-max');
+            var cosMin = getNum('f-costo-min'),  cosMax = getNum('f-costo-max');
+            var risMin = getNum('f-risorse-min'),risMax = getNum('f-risorse-max');
+            var fabMin = getNum('f-fabb-min'),   fabMax = getNum('f-fabb-max');
+
+            if(iniMin !== null && (inizio === null || inizio < iniMin)) return false;
+            if(iniMax !== null && (inizio === null || inizio > iniMax)) return false;
+            if(finMin !== null && (fine   === null || fine   < finMin)) return false;
+            if(finMax !== null && (fine   === null || fine   > finMax)) return false;
+            if(cosMin !== null && (costo  === null || costo  < cosMin)) return false;
+            if(cosMax !== null && (costo  === null || costo  > cosMax)) return false;
+            if(risMin !== null && (risorse === null || risorse < risMin)) return false;
+            if(risMax !== null && (risorse === null || risorse > risMax)) return false;
+            if(fabMin !== null && (fabb   === null || fabb   < fabMin)) return false;
+            if(fabMax !== null && (fabb   === null || fabb   > fabMax)) return false;
+
+            var faseChecked  = getChecked('f-fase-checks');
+            var tipoChecked  = getChecked('f-tipo-checks');
+            var tempiChecked = getChecked('f-tempi-checks');
+            var commChecked  = getChecked('f-commiss-checks');
+
+            if(faseChecked.length  && faseChecked.indexOf(fase)   < 0) return false;
+            if(tipoChecked.length  && tipoChecked.indexOf(tipo)   < 0) return false;
+            if(tempiChecked.length && tempiChecked.indexOf(tempi) < 0) return false;
+            if(commChecked.length  && commChecked.indexOf(commiss) < 0) return false;
+
+            // Text search: matches Nome, Codice, Cod, Settore (case-insensitive, partial match)
+            var textEl = document.getElementById('f-text-search');
+            if(textEl && textEl.value.trim() !== '') {
+                var q = textEl.value.trim().toLowerCase();
+                var nome    = (String(props['Tracciati_Nome']  || props['Nome']    || '')).toLowerCase();
+                var cod     = (String(props['Tracciati_Cod']   || props['Cod']     || props['Codice'] || '')).toLowerCase();
+                var settore = (String(props['Tracciati_Settore']|| props['Settore']|| '')).toLowerCase();
+                if(nome.indexOf(q) < 0 && cod.indexOf(q) < 0 && settore.indexOf(q) < 0) return false;
+            }
+
+            return true;
+        }
+
+        function dbg(msg) {
+            var el = document.getElementById('filter-debug');
+            if(!el) return;
+            el.style.display = 'block';
+            el.textContent += msg + '\n';
+        }
+
+        function applyFilters() {
+            // Guard: data not yet loaded (can happen if user clicks before map init)
+            if(!allRoadFeatures || !allPointFeatures) return;
+
+            var dbgEl = document.getElementById('filter-debug');
+            if(dbgEl) { dbgEl.textContent = ''; dbgEl.style.display = 'block'; }
+
+            var hasAny = checkHasActiveFilter();
+            dbg('Filter active: ' + hasAny);
+            dbg('Roads total: ' + allRoadFeatures.length + ' | Points total: ' + allPointFeatures.length);
+
+            // Filter the raw GeoJSON arrays
+            var filteredRoads  = hasAny
+                ? allRoadFeatures.filter(function(f){ return featureMatchesProps(f.properties, 'road'); })
+                : allRoadFeatures.slice(0);
+
+            var filteredPoints = hasAny
+                ? allPointFeatures.filter(function(f){ return featureMatchesProps(f.properties, 'point'); })
+                : allPointFeatures.slice(0);
+
+            dbg('Roads matched: ' + filteredRoads.length + ' | Points matched: ' + filteredPoints.length);
+
+            // CLEAR and RE-ADD — no setStyle conflict possible
+            layer_Tracciati_opere_CN__strada_ferrovia_rev_1.clearLayers();
+            layer_Tracciati_opere_CN__strada_ferrovia_rev_1.addData(filteredRoads);
+
+            layer_Tracciati_opere_CN__punti_2.clearLayers();
+            layer_Tracciati_opere_CN__punti_2.addData(filteredPoints);
+
+            // Re-attach click handlers (addData creates new layers, losing the old onEachFeature)
+            layer_Tracciati_opere_CN__strada_ferrovia_rev_1.eachLayer(function(l){
+                if(!l.feature) return;
+                var feature = l.feature;
+                l.on({
+                    mouseover: function(e){ e.target.setStyle({color:'#ffee88',weight:4}); },
+                    mouseout:  function(e){ e.target.setStyle({color:getInfraColor(feature.properties),weight:2.0}); },
+                    click:     function(e){ openInfraPanel(feature.properties, e.target, 'road'); L.DomEvent.stopPropagation(e); }
+                });
+            });
+            layer_Tracciati_opere_CN__punti_2.eachLayer(function(l){
+                if(!l.feature) return;
+                var feature = l.feature;
+                l.on({
+                    mouseover: function(e){ e.target.setStyle({fillColor:'#ffee88',fillOpacity:1,radius:8}); },
+                    mouseout:  function(e){ e.target.setStyle({fillColor:'rgba(225,89,137,1.0)',fillOpacity:1,radius:6}); },
+                    click:     function(e){ openInfraPanel(feature.properties, e.target, 'point'); L.DomEvent.stopPropagation(e); }
+                });
+            });
+
+            // Update results list
+            var matchedWrappers = filteredRoads.map(function(f){ return makeWrapper(f,'road'); })
+                                  .concat(filteredPoints.map(function(f){ return makeWrapper(f,'point'); }));
+            renderResultsList(matchedWrappers);
+
+            var btn = document.getElementById('filter-toggle-btn');
+            if(btn) btn.classList.toggle('active', hasAny);
+        }
+
+        function renderResultsList(features) {
+            var listEl  = document.getElementById('filter-results-list');
+            var countEl = document.getElementById('filter-count');
+            if(!listEl) return;
+            listEl.innerHTML = '';
+            countEl.textContent = features.length + ' project' + (features.length !== 1 ? 's' : '') + ' found';
+            features.forEach(function(f) {
+                var nome    = getProp(f.props, f.featureType, 'Nome') || '–';
+                var settore = getProp(f.props, f.featureType, 'Settore') || '';
+                var icon    = settore === 'Ferrovia' ? '🚂' : f.featureType === 'point' ? '⛰' : '🛣';
+                var item = document.createElement('div');
+                item.className = 'filter-result-item';
+                item.innerHTML = '<span class="ri-icon">' + icon + '</span>'
+                               + '<span class="ri-name">' + nome + '</span>'
+                               + '<span class="ri-sector">' + settore + '</span>';
+                item.addEventListener('click', (function(feat){
+                    return function(){
+                        // Find live layer by matching feature name
+                        var foundLayer = null;
+                        var targetName = getProp(feat.props, feat.featureType, 'Nome');
+                        var lyrGroup = feat.featureType === 'road'
+                            ? layer_Tracciati_opere_CN__strada_ferrovia_rev_1
+                            : layer_Tracciati_opere_CN__punti_2;
+                        lyrGroup.eachLayer(function(l){
+                            if(!foundLayer && l.feature && getProp(l.feature.properties, feat.featureType, 'Nome') === targetName)
+                                foundLayer = l;
+                        });
+                        openInfraPanel(feat.props, foundLayer, feat.featureType);
+                        if(foundLayer) {
+                            try {
+                                if(foundLayer.getBounds) map.fitBounds(foundLayer.getBounds(), {maxZoom:13, padding:[40,40]});
+                                else if(foundLayer.getLatLng) map.setView(foundLayer.getLatLng(), 12);
+                            } catch(e){}
+                        }
+                    };
+                })(f));
+                listEl.appendChild(item);
+            });
+        }
+
+        function checkHasActiveFilter() {
+            var numIds = ['f-inizio-min','f-inizio-max','f-fine-min','f-fine-max',
+                          'f-costo-min','f-costo-max','f-risorse-min','f-risorse-max',
+                          'f-fabb-min','f-fabb-max'];
+            for(var i = 0; i < numIds.length; i++) {
+                var el = document.getElementById(numIds[i]);
+                if(el && el.value.trim() !== '') return true;
+            }
+            var cbGroups = ['f-fase-checks','f-tipo-checks','f-tempi-checks','f-commiss-checks'];
+            for(var g = 0; g < cbGroups.length; g++) {
+                if(getChecked(cbGroups[g]).length) return true;
+            }
+            var textEl = document.getElementById('f-text-search');
+            if(textEl && textEl.value.trim() !== '') return true;
+            return false;
+        }
+
+        function toggleFilterPanel() {
+            var panel = document.getElementById('filter-panel');
+            var btn   = document.getElementById('filter-toggle-btn');
+            var isOpen = panel.classList.contains('open');
+            if(!isOpen && btn) {
+                var rect = btn.getBoundingClientRect();
+                panel.style.top  = rect.top + 'px';
+                panel.style.left = (rect.right + 8) + 'px';
+            }
+            panel.classList.toggle('open');
+        }
+
+        function resetFilters() {
+            ['f-inizio-min','f-inizio-max','f-fine-min','f-fine-max',
+             'f-costo-min','f-costo-max','f-risorse-min','f-risorse-max',
+             'f-fabb-min','f-fabb-max'].forEach(function(id){
+                var el = document.getElementById(id);
+                if(el) el.value = '';
+            });
+            document.querySelectorAll('#filter-panel input[type=checkbox]')
+                .forEach(function(cb){ cb.checked = false; });
+            var textEl = document.getElementById('f-text-search');
+            if(textEl) textEl.value = '';
+            applyFilters();
+        }
+
+        // Expose to global scope so HTML onclick attributes can call them
+        window.applyFilters         = applyFilters;
+        window.resetFilters         = resetFilters;
+        window.toggleFilterPanel    = toggleFilterPanel;
+        window.openOverlay          = openOverlay;
+        window.closeOverlay         = closeOverlay;
+        window.closeOverlayBackdrop = closeOverlayBackdrop;
+        window.setLang              = setLang;
+        window.switchTab            = switchTab;
+        window.closeMuniPanel       = closeMuniPanel;
+        window.openDemoPanel        = openDemoPanel;
+        window.openBizPanel         = openBizPanel;
+        window.openInfraPanel       = openInfraPanel;
+        </script>
+    </body>
+</html>
